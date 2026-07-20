@@ -6,7 +6,8 @@
 
   "cable": {
     "name": "Cable_A",
-    "ai_channel": "cDAQ9185-2409D60Mod4/ai0",
+    "ai_channel_i": "cDAQ9185-2409D60Mod4/ai0",
+    "ai_channel_j": "cDAQ9185-2409D60Mod4/ai1",
 
     "conductors": [
       {
