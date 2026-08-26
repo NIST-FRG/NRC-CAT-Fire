@@ -4,3 +4,5 @@
 
 `Plot_EaB.py` is a Python script that plots the results of the elongation-at-break experiments.
 
+`resistance_calculator.py` is a Python script to perform the calculation on page B-4 of the CAROLFIRE vol. 1 report.
+
