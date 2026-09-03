@@ -95,10 +95,62 @@ def init_csv(path):
         ])
 
 
-def append_csv(path, row):
-    with open(path, 'a', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(row)
+def append_csv(path, row, pending_rows, warn_every=25):
+    """Append a row to the CSV, buffering in memory if the file is locked.
+
+    If another program (e.g. Excel) currently has the file locked, the
+    row is added to `pending_rows` instead of blocking the acquisition
+    loop. Every call first attempts to flush any previously buffered
+    rows (in original order) along with the new one, so nothing is
+    written out of order and nothing is lost as long as the process
+    keeps running. A warning prints on the first buffered row and every
+    `warn_every` rows after that, so a stuck lock doesn't go unnoticed.
+    """
+    pending_rows.append(row)
+
+    try:
+        with open(path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(pending_rows)
+        if len(pending_rows) > 1:
+            print(f"[irms] Flushed {len(pending_rows)} buffered row(s) to {path}.")
+        pending_rows.clear()
+    except PermissionError:
+        if len(pending_rows) == 1 or len(pending_rows) % warn_every == 0:
+            print(
+                f"[irms] WARNING: {path} appears locked by another program "
+                f"(e.g. open in Excel). Buffering measurements in memory "
+                f"({len(pending_rows)} row(s) pending) -- close the other "
+                f"program to flush them to disk."
+            )
+
+
+def flush_pending_or_save_fallback(path, pending_rows):
+    """Best-effort final flush of any buffered rows on shutdown.
+
+    Tries once more to write pending rows to the main CSV. If the file
+    is still locked, writes them to a fallback file instead of losing
+    them silently -- merge that file in manually once `path` is free.
+    """
+    if not pending_rows:
+        return
+
+    try:
+        with open(path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(pending_rows)
+        print(f"[irms] Flushed {len(pending_rows)} buffered row(s) on shutdown.")
+        pending_rows.clear()
+    except PermissionError:
+        fallback_path = path + ".pending"
+        with open(fallback_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(pending_rows)
+        print(
+            f"[irms] {path} still locked at shutdown. Saved "
+            f"{len(pending_rows)} unwritten row(s) to {fallback_path} -- "
+            f"append them manually once the file is free."
+        )
 
 
 # -----------------------------
@@ -144,6 +196,7 @@ def run(config_path):
 
     stop_requested = False
     i = 0
+    pending_rows = []
 
     try:
         while True:
@@ -178,7 +231,7 @@ def run(config_path):
                     measure_id,
                     avg_voltage_i,
                     avg_voltage_j
-                ])
+                ], pending_rows)
 
                 # OFF
                 relay.clear()
@@ -202,6 +255,7 @@ def run(config_path):
         relay.clear()
         relay.close()
         ai_task.close()
+        flush_pending_or_save_fallback(output_file, pending_rows)
 
 
 # -----------------------------
