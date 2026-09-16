@@ -35,7 +35,7 @@ def create_aging_plot(file_path):
     # Set axis limits
     # Note: On a log scale, the minimum cannot be 0. 
     # Using 0.1 for X (as requested) and a small positive value for Y.
-    ax.set_xlim(0.1, 100)
+    ax.set_xlim(0.1, 200)
     ax.set_ylim(1, 500)
     ax.set_box_aspect(1)
 
