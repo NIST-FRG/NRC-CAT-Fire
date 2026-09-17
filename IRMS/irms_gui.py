@@ -54,7 +54,7 @@ class LiveCableMonitor:
 
         # data[energized_id][measured_id] = ([x...], [y...])
         self.data = {
-            e: {m: ([], []) for m in self.conductor_ids if m != e}
+            e: {m: ([], []) for m in self.conductor_ids}
             for e in self.conductor_ids
         }
 
@@ -93,8 +93,6 @@ class LiveCableMonitor:
             ax.set_ylabel("V_j (measured side)")
 
             for measured_id in self.conductor_ids:
-                if measured_id == energized_id:
-                    continue
                 (line,) = ax.plot([], [], label=f"Meas {measured_id}")
                 lines_by_pair[(energized_id, measured_id)] = line
 
@@ -186,9 +184,6 @@ class LiveCableMonitor:
                 avg_v_j = float(avg_v_j)
             except (ValueError, IndexError):
                 continue  # skip malformed/partial rows
-
-            if energized_id == measured_id:
-                continue  # self-pair, not part of the n-1 lines
 
             pair = (energized_id, measured_id)
             if pair not in self.lines_by_pair:
