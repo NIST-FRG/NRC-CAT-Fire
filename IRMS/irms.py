@@ -1,9 +1,10 @@
 import json
 import time
 import csv
+import statistics
 
 import nidaqmx
-from nidaqmx.constants import AcquisitionType
+from nidaqmx.constants import AcquisitionType, TaskMode
 
 
 # -----------------------------
@@ -180,7 +181,7 @@ def run(config_path):
     relay.clear()
 
     # -----------------------------
-    # CREATE DAQ TASK ONCE
+    # CREATE AND COMMIT DAQ TASK ONCE
     # -----------------------------
     ai_task = nidaqmx.Task()
     ai_task.ai_channels.add_ai_voltage_chan(ai_channel_i)
@@ -191,6 +192,11 @@ def run(config_path):
         sample_mode=AcquisitionType.FINITE,
         samps_per_chan=samples
     )
+
+    ai_task.control(TaskMode.TASK_COMMIT)
+    ai_task.in_stream.auto_start = False
+
+    read_timeout = (samples / actual_sample_rate) + 2.0
 
     start_time = time.time()
 
@@ -211,15 +217,35 @@ def run(config_path):
                     measure["measure_do"]
                 ]
 
+                #loop_start = time.perf_counter()
+                #t = time.perf_counter()
+
                 # ON
                 relay.set_lines(active)
+                #after_relay_on = time.perf_counter()
 
                 time.sleep(relay_settling_time)
+                #after_sleep = time.perf_counter()
 
                 # Measurement
-                data = ai_task.read(number_of_samples_per_channel=samples)
+                #data = ai_task.read(number_of_samples_per_channel=samples)
+
+                ai_task.start()
+                try:
+                  data = ai_task.read(
+                    number_of_samples_per_channel = samples,
+                    timeout = read_timeout
+                  )
+                finally:
+                  ai_task.stop()
+
+                #after_read = time.perf_counter()
                 avg_voltage_i = sum(data[0]) / len(data[0])
                 avg_voltage_j = sum(data[1]) / len(data[1])
+                #std_dev_i = statistics.stdev(data[0])
+                #std_dev_j = statistics.stdev(data[1])
+
+                #after_average = time.perf_counter()
 
                 now = time.time()
                 elapsed = now - start_time
@@ -233,8 +259,25 @@ def run(config_path):
                     avg_voltage_j
                 ], pending_rows)
 
+                #after_csv = time.perf_counter()
+
                 # OFF
                 relay.clear()
+                #after_relay_off = time.perf_counter()
+
+                #print(
+                  #f"on={after_relay_on - t:.4f}s, "
+                  #f"settle={after_sleep - after_relay_on:.4f}s, "
+                  #f"read={after_read - after_sleep:.4f}s, "
+                  #f"average={after_average - after_read:.4f}s, "
+                  #f"csv={after_csv - after_average:.4f}s, "
+                  #f"off={after_relay_off - after_csv:.4f}s, "
+                  #f"total={after_relay_off - loop_start:.4f}s, "
+                  #f"avg_i={avg_voltage_i:.4f}, "
+                  #f"avg_j={avg_voltage_j:.4f}, "
+                  #f"stdev_i={std_dev_i:.4f}, "
+                  #f"stdev_j={std_dev_j:.4f}"
+                #)
 
                 i += 1
 
