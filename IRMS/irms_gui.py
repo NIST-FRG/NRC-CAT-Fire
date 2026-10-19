@@ -166,7 +166,7 @@ class LiveCableMonitor:
 
         return new_rows
 
-    # ---- animation callback ----
+        # ---- animation callback ----
 
     def _update(self, frame):
         rows = self._read_new_rows()
@@ -177,11 +177,18 @@ class LiveCableMonitor:
 
         for row in rows:
             try:
-                _timestamp, elapsed, energized_id, measured_id, _avg_v_i, avg_v_j = row
-                elapsed = float(elapsed)
-                energized_id = int(energized_id)
-                measured_id = int(measured_id)
-                avg_v_j = float(avg_v_j)
+                # Read only the six columns used by the monitor.
+                # Any additional columns at the end are ignored.
+                if len(row) < 6:
+                    continue
+
+                _timestamp = row[0]
+                elapsed = float(row[1])
+                energized_id = int(row[2])
+                measured_id = int(row[3])
+                _avg_v_i = row[4]
+                avg_v_j = float(row[5])
+
             except (ValueError, IndexError):
                 continue  # skip malformed/partial rows
 
